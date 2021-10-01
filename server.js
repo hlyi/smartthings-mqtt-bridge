@@ -36,6 +36,9 @@ var CONFIG_DIR = process.env.CONFIG_DIR || process.cwd(),
     SUFFIX_WRITE_STATE = 'state_write_suffix',
     RETAIN = 'retain';
 
+var  lastSubTime,
+     subBlackoutTime = 500;
+
 var app = express(),
     client,
     subscriptions = [],
@@ -208,6 +211,7 @@ function handleSubscribeEvent (req, res) {
 
     // Subscribe to events
     winston.info('Subscribing to ' + subscriptions.join(', '));
+    lastSubTime = Date.now();
     client.subscribe(subscriptions, function () {
         res.send({
             status: 'OK'
@@ -251,6 +255,7 @@ function getTopicFor (device, property, type) {
  */
 function parseMQTTMessage (topic, message) {
     var contents = message.toString();
+    var curTime = Date.now();
     winston.info('Incoming message from MQTT: %s = %s', topic, contents);
 
     // Remove the preface from the topic before splitting it
@@ -287,13 +292,22 @@ function parseMQTTMessage (topic, message) {
         contents = history[topicLevelCommand];
     }
 
+    var cmd = !pieces[2] || pieces[2] && pieces[2] === config.mqtt[SUFFIX_COMMAND];
+    if ( ! cmd ) {
+	    return;
+    }
+    if ( curTime < ( lastSubTime + subBlackoutTime ) ) {
+        winston.info('Ignore message due to subscription blackout window: %s/%s = %s', device, property, contents);
+	return;
+    }
+    winston.info('Sending to Smartthings: %s/%s = %s', device, property, contents);
     request.post({
         url: 'http://' + callback,
         json: {
             name: device,
             type: property,
             value: contents,
-            command: (!pieces[2] || pieces[2] && pieces[2] === config.mqtt[SUFFIX_COMMAND])
+            command: cmd
         }
     }, function (error, resp) {
         if (error) {
@@ -332,6 +346,7 @@ async.series([
         client.on('message', parseMQTTMessage);
         client.on('connect', function () {
             if (subscriptions.length > 0) {
+		lastSubTime = Date.now();
                 client.subscribe(subscriptions);
             }
             next();

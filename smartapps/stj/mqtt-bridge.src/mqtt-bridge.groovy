@@ -135,6 +135,14 @@ import groovy.transform.Field
             "energy"
         ]
     ],
+    "fanSpeed": [
+        name: "Fan Speed",
+        capability: "capability.fanSpeed",
+        attributes: [
+            "fanSpeed"
+        ],
+        action: "actionFanSpeed"
+    ],
     "garageDoors": [
         name: "Garage Door Control",
         capability: "capability.garageDoorControl",
@@ -441,7 +449,7 @@ import groovy.transform.Field
 ]
 
 definition(
-    name: "MQTT Bridge",
+    name: "MQTT Bridge App",
     namespace: "stj",
     author: "St. John Johnson and Jeremiah Wuenschel",
     description: "A bridge between SmartThings and MQTT",
@@ -703,6 +711,10 @@ def actionMusicPlayer(device, attribute, value) {
 
 def actionColorTemperature(device, attribute, value) {
     device.setColorTemperature(value as int)
+}
+
+def actionFanSpeed(device, attribute, value) {
+    device.setFanSpeed(value as int)
 }
 
 def actionLevel(device, attribute, value) {

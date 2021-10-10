@@ -79,6 +79,7 @@ function loadConfiguration () {
 function loadDevices () {
 	if (!fs.existsSync(DEVCFG_FILE)) {
 		winston.info('No device configuration is missing. no autorecovery.');
+		return;
 	}
 
 	devcfg = yaml.safeLoad(fs.readFileSync(DEVCFG_FILE));
@@ -208,6 +209,7 @@ function handlePushEvent (req, res) {
 }
 
 function sendDiscovery ( devs ) {
+	let hastr = 'homeassistant';
 	for ( let dev in devs ) {
 		let devtype = '';
 		let devname = '';
@@ -218,22 +220,22 @@ function sendDiscovery ( devs ) {
 				devtype = cfg['type'];
 			}
 		}
-		if ( devtype == '' ) {
+		if ( devtype === '' ) {
 			let devArr = /^(.*?)[\s-]+(\w+)\s*$/.exec(devname ? devname : dev);
-			if ( devArr.index < 2 ) {
+			if ( ! devArr ) {
 				winston.info('Device ' + dev + ' does not have type, auto type detection failed, skipping');
 				continue;
 			}
 			devtype = devArr[2];
-			if ( devname == '' ) {
-				devname = devArr[1];
+			if ( devname === '' ) {
+				devname = dev;
 			}
 		}
 		let devinfo = {};
 		let devid = devname;
-		devid.replaceAll(' ','_');
+		devid = 'st_mqtt_br-' + devid.replace(/\s+/g,'_');
 		devinfo['device'] = {} ;
-		devinfo['device']['name'] = devid;
+		devinfo['device']['name'] = devname;
 		devinfo['device']['model'] = 'unknown';
 		devinfo['device']['manufacturer'] = 'Smartthings Bridge';
 		devinfo['device']['identifiers'] = [];
@@ -241,27 +243,38 @@ function sendDiscovery ( devs ) {
 		devinfo['name'] = devname;
 
 		devtype = devtype.toLowerCase();
+		let devtopic = '';
 		if ( devtype  == 'light' ) {
+			let uniqid = devid + '-light';
+			devinfo['unique_id'] = uniqid;
 			if (! devs[dev].hasOwnProperty('switch') ) {
 				winston.info('Device ' + dev + ' missing swtich attribute for light component');
 				continue;
 			}
 			devinfo['cmd_t'] = devs[dev]['switch']['cmd'];
 			devinfo['stat_t'] = devs[dev]['switch']['state'];
-			devs[dev].delete('switch');
+			devinfo['pl_on'] = 'on';
+			devinfo['pl_off'] = 'off';
+			delete devs[dev]['switch'];
 			if ( devs[dev].hasOwnProperty('level') ) {
 				devinfo['bri_cmd_t'] = devs[dev]['level']['cmd'];
-				devinfo['bri_state_t'] = devs[dev]['level']['state'];
+				devinfo['bri_stat_t'] = devs[dev]['level']['state'];
 				devinfo['bri_scl'] = 100;
-				devs[dev].delete('level');
+				delete devs[dev]['level'];
 			}
 			for ( let attr in devs[dev] ) {
 				winston.info('Device ' + dev + ' has unsupported attribute ' + attr  );
 			}
+			devtopic = hastr + '/light/' + devid + '/' + uniqid + '/config';
+		}else {
+			winston.info('Device ' + dev + ' has unsupported type ' + devtype + ', skipping');
+			continue;
 		}
 		let devstr = JSON.stringify(devinfo);
-		winston.info('Device ' + dev + ' send config ' + devstr );
-
+		winston.info('Device ' + devtopic + ' send config: ' + devstr );
+		client.publish(devtopic, devstr, {
+			retain: config.mqtt[RETAIN]
+			});
 	}
 }
 
@@ -294,14 +307,13 @@ function handleSubscribeEvent (req, res) {
 			subscriptions.push(getTopicFor(device, property, TOPIC_WRITE_STATE));
 		});
 	});
+	sendDiscovery( devattr);
 
 	// Store callback
 	callback = req.body.callback;
 
 	// Store current state on disk
-	saveState(devattr);
-
-	sendDiscovery();
+	saveState();
 
 	// Subscribe to events
 	winston.info('Subscribing to ' + subscriptions.join(', '));

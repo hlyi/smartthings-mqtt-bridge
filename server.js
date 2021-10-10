@@ -283,7 +283,53 @@ function sendDiscovery ( devs ) {
 				devinfo['spd_rng_max'] = 3;
 				delete devs[dev]['fanSpeed'];
 			}
+			if ( devs[dev].hasOwnProperty('level') ) {
+				// ignore level since we are using fanspeed
+				delete devs[dev]['level'];
+			}
 			configs[hastr + '/fan/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+		}else if ( devtype  == 'waterleak' ) {
+			let cmndevstr = JSON.stringify(devinfo);
+
+			// main water leak sensor
+			let uniqid = devid + '-sensor';
+			devinfo['unique_id'] = uniqid;
+			if (! devs[dev].hasOwnProperty('water') ) {
+				winston.info('Device ' + dev + ' missing water attribute for fan component');
+				continue;
+			}
+			devinfo['stat_t'] = devs[dev]['water']['state'];
+			devinfo['pl_on'] = 'wet';
+			devinfo['pl_off'] = 'dry';
+			devinfo['dev_cla'] = 'moisture';
+			delete devs[dev]['water'];
+			configs[hastr + '/binary_sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+
+			// battery 
+			if ( devs[dev].hasOwnProperty('battery') ) {
+				devinfo = JSON.parse(cmndevstr);
+				devinfo['name'] = devname + ' Battery';
+				uniqid = devid + '-battery';
+				devinfo['unique_id'] = uniqid;
+				devinfo['dev_cla'] = 'battery';
+				devinfo['unit_of_meas'] = '%';
+				devinfo['stat_t'] =  devs[dev]['battery']['state'];
+				delete devs[dev]['battery'];
+				configs[hastr + '/sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+			}
+
+			// temperature
+			if ( devs[dev].hasOwnProperty('temperature') ) {
+				devinfo = JSON.parse(cmndevstr);
+				devinfo['name'] = devname + ' Temperature';
+				uniqid = devid + '-temperature';
+				devinfo['unique_id'] = uniqid;
+				devinfo['dev_cla'] = 'temperature';
+				devinfo['unit_of_meas'] = '°F';
+				devinfo['stat_t'] =  devs[dev]['temperature']['state'];
+				delete devs[dev]['temperature'];
+				configs[hastr + '/sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+			}
 		}else {
 			winston.info('Device ' + dev + ' has unsupported type ' + devtype + ', skipping');
 			continue;

@@ -243,7 +243,8 @@ function sendDiscovery ( devs ) {
 		devinfo['name'] = devname;
 
 		devtype = devtype.toLowerCase();
-		let devtopic = '';
+		let configs = {};
+
 		if ( devtype  == 'light' ) {
 			let uniqid = devid + '-light';
 			devinfo['unique_id'] = uniqid;
@@ -262,19 +263,39 @@ function sendDiscovery ( devs ) {
 				devinfo['bri_scl'] = 100;
 				delete devs[dev]['level'];
 			}
-			for ( let attr in devs[dev] ) {
-				winston.info('Device ' + dev + ' has unsupported attribute ' + attr  );
+			configs[hastr + '/light/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+		}else if ( devtype  == 'fan' ) {
+			let uniqid = devid + '-fan';
+			devinfo['unique_id'] = uniqid;
+			if (! devs[dev].hasOwnProperty('switch') ) {
+				winston.info('Device ' + dev + ' missing swtich attribute for fan component');
+				continue;
 			}
-			devtopic = hastr + '/light/' + devid + '/' + uniqid + '/config';
+			devinfo['cmd_t'] = devs[dev]['switch']['cmd'];
+			devinfo['stat_t'] = devs[dev]['switch']['state'];
+			devinfo['pl_on'] = 'on';
+			devinfo['pl_off'] = 'off';
+			delete devs[dev]['switch'];
+			if ( devs[dev].hasOwnProperty('fanSpeed') ) {
+				devinfo['pct_cmd_t'] = devs[dev]['fanSpeed']['cmd'];
+				devinfo['pct_stat_t'] = devs[dev]['fanSpeed']['state'];
+				devinfo['spd_rng_min'] = 1;
+				devinfo['spd_rng_max'] = 3;
+				delete devs[dev]['fanSpeed'];
+			}
+			configs[hastr + '/fan/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
 		}else {
 			winston.info('Device ' + dev + ' has unsupported type ' + devtype + ', skipping');
 			continue;
 		}
-		let devstr = JSON.stringify(devinfo);
-		winston.info('Device ' + devtopic + ' send config: ' + devstr );
-		client.publish(devtopic, devstr, {
-			retain: config.mqtt[RETAIN]
-			});
+		for ( let attr in devs[dev] ) {
+			winston.info('Device ' + dev + ' has unsupported attribute ' + attr  );
+		}
+		for ( let devtopic in configs ) {
+			let devstr = configs[devtopic];
+			winston.info('Device ' + devtopic + ' send config: ' + devstr );
+			client.publish(devtopic, devstr, { retain: config.mqtt[RETAIN] });
+		}
 	}
 }
 

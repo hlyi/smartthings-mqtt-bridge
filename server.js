@@ -84,7 +84,7 @@ function loadDevices () {
 
 	devcfg = yaml.safeLoad(fs.readFileSync(DEVCFG_FILE));
 	for ( var dev in devcfg ) {
-		if ( dev.hasOwnProperty('stname') ) {
+		if ( 'stname' in dev ) {
 			devcfglookup[dev.stname] = dev;
 			winston.info('Map Smartthing "' + dev.stname + '" to "' + dev +'"');
 		}
@@ -213,10 +213,10 @@ function sendDiscovery ( devs ) {
 	for ( let dev in devs ) {
 		let devtype = '';
 		let devname = '';
-		if ( devcfglookup.hasOwnProperty(dev) ) {
+		if ( dev in devcfglookup ) {
 			devname = devcfglookup[dev];
 			let cfg = devcfg[devname];
-			if ( cfg.hasOwnProperty('type') ) {
+			if ( 'type' in cfg ) {
 				devtype = cfg['type'];
 			}
 		}
@@ -248,7 +248,7 @@ function sendDiscovery ( devs ) {
 		if ( devtype  == 'light' ) {
 			let uniqid = devid + '-light';
 			devinfo['unique_id'] = uniqid;
-			if (! devs[dev].hasOwnProperty('switch') ) {
+			if (! ( 'switch' in devs[dev] ) ) {
 				winston.info('Device ' + dev + ' missing swtich attribute for light component');
 				continue;
 			}
@@ -257,7 +257,7 @@ function sendDiscovery ( devs ) {
 			devinfo['pl_on'] = 'on';
 			devinfo['pl_off'] = 'off';
 			delete devs[dev]['switch'];
-			if ( devs[dev].hasOwnProperty('level') ) {
+			if ( 'level' in devs[dev] ) {
 				devinfo['bri_cmd_t'] = devs[dev]['level']['cmd'];
 				devinfo['bri_stat_t'] = devs[dev]['level']['state'];
 				devinfo['bri_scl'] = 100;
@@ -267,7 +267,7 @@ function sendDiscovery ( devs ) {
 		}else if ( devtype  == 'fan' ) {
 			let uniqid = devid + '-fan';
 			devinfo['unique_id'] = uniqid;
-			if (! devs[dev].hasOwnProperty('switch') ) {
+			if (! ( 'switch' in devs[dev] ) ) {
 				winston.info('Device ' + dev + ' missing swtich attribute for fan component');
 				continue;
 			}
@@ -276,14 +276,14 @@ function sendDiscovery ( devs ) {
 			devinfo['pl_on'] = 'on';
 			devinfo['pl_off'] = 'off';
 			delete devs[dev]['switch'];
-			if ( devs[dev].hasOwnProperty('fanSpeed') ) {
+			if ( 'fanSpeed' in devs[dev] ) {
 				devinfo['pct_cmd_t'] = devs[dev]['fanSpeed']['cmd'];
 				devinfo['pct_stat_t'] = devs[dev]['fanSpeed']['state'];
 				devinfo['spd_rng_min'] = 1;
 				devinfo['spd_rng_max'] = 3;
 				delete devs[dev]['fanSpeed'];
 			}
-			if ( devs[dev].hasOwnProperty('level') ) {
+			if ( 'level' in devs[dev] ) {
 				// ignore level since we are using fanspeed
 				delete devs[dev]['level'];
 			}
@@ -294,8 +294,8 @@ function sendDiscovery ( devs ) {
 			// main water leak sensor
 			let uniqid = devid + '-sensor';
 			devinfo['unique_id'] = uniqid;
-			if (! devs[dev].hasOwnProperty('water') ) {
-				winston.info('Device ' + dev + ' missing water attribute for fan component');
+			if (! ( 'water' in devs[dev] ) ) {
+				winston.info('Device ' + dev + ' missing water attribute for water leak sensor component');
 				continue;
 			}
 			devinfo['stat_t'] = devs[dev]['water']['state'];
@@ -306,7 +306,7 @@ function sendDiscovery ( devs ) {
 			configs[hastr + '/binary_sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
 
 			// battery 
-			if ( devs[dev].hasOwnProperty('battery') ) {
+			if ( 'battery' in devs[dev] ) {
 				devinfo = JSON.parse(cmndevstr);
 				devinfo['name'] = devname + ' Battery';
 				uniqid = devid + '-battery';
@@ -319,7 +319,7 @@ function sendDiscovery ( devs ) {
 			}
 
 			// temperature
-			if ( devs[dev].hasOwnProperty('temperature') ) {
+			if ( 'temperature' in devs[dev] ) {
 				devinfo = JSON.parse(cmndevstr);
 				devinfo['name'] = devname + ' Temperature';
 				uniqid = devid + '-temperature';
@@ -330,6 +330,36 @@ function sendDiscovery ( devs ) {
 				delete devs[dev]['temperature'];
 				configs[hastr + '/sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
 			}
+		}else if ( devtype  == 'outlet' ) {
+			let cmndevstr = JSON.stringify(devinfo);
+
+			// main water leak sensor
+			let uniqid = devid + '-switch';
+			devinfo['unique_id'] = uniqid;
+			if (! ( 'switch' in devs[dev] ) ){
+				winston.info('Device ' + dev + ' missing switch attribute for outlet component');
+				continue;
+			}
+			devinfo['cmd_t'] = devs[dev]['switch']['cmd'];
+			devinfo['stat_t'] = devs[dev]['switch']['state'];
+			devinfo['pl_on'] = 'on';
+			devinfo['pl_off'] = 'off';
+			delete devs[dev]['switch'];
+			configs[hastr + '/switch/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+
+			// power
+			if ( 'power' in devs[dev] ) {
+				devinfo = JSON.parse(cmndevstr);
+				devinfo['name'] = devname + ' Power';
+				uniqid = devid + '-power';
+				devinfo['unique_id'] = uniqid;
+				devinfo['dev_cla'] = 'power';
+				devinfo['unit_of_meas'] = 'W';
+				devinfo['stat_t'] =  devs[dev]['power']['state'];
+				delete devs[dev]['power'];
+				configs[hastr + '/sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+			}
+
 		}else {
 			winston.info('Device ' + dev + ' has unsupported type ' + devtype + ', skipping');
 			continue;
@@ -339,7 +369,7 @@ function sendDiscovery ( devs ) {
 		}
 		for ( let devtopic in configs ) {
 			let devstr = configs[devtopic];
-			winston.info('Device ' + devtopic + ' send config: ' + devstr );
+//			winston.info('Device ' + devtopic + ' send config: ' + devstr );
 			client.publish(devtopic, devstr, { retain: config.mqtt[RETAIN] });
 		}
 	}
@@ -361,10 +391,10 @@ function handleSubscribeEvent (req, res) {
 	let devattr = {};
 	Object.keys(req.body.devices).forEach(function (property) {
 		req.body.devices[property].forEach(function (device) {
-			if ( ! devattr.hasOwnProperty(device) ) {
+			if ( ! ( device in devattr ) ){
 				devattr[device] = {};
 			}
-			if ( ! devattr[device].hasOwnProperty(property) ) {
+			if ( ! ( property in devattr[device] ) ) {
 				devattr[device][property] =  {};
 			}
 			let cmd = getTopicFor(device,property, TOPIC_COMMAND);

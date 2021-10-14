@@ -305,7 +305,7 @@ function sendDiscovery ( devs ) {
 			delete devs[dev]['water'];
 			configs[hastr + '/binary_sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
 
-			// battery 
+			// battery
 			if ( 'battery' in devs[dev] ) {
 				devinfo = JSON.parse(cmndevstr);
 				devinfo['name'] = devname + ' Battery';
@@ -359,7 +359,47 @@ function sendDiscovery ( devs ) {
 				delete devs[dev]['power'];
 				configs[hastr + '/sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
 			}
+		}else if ( devtype  == 'motion' ) {
+			let cmndevstr = JSON.stringify(devinfo);
 
+			// main motion sensor
+			let uniqid = devid + '-motion';
+			devinfo['unique_id'] = uniqid;
+			if (! ( 'motion' in devs[dev] ) ) {
+				winston.info('Device ' + dev + ' missing motion attribute for motion sensor component');
+				continue;
+			}
+			devinfo['stat_t'] = devs[dev]['motion']['state'];
+			devinfo['pl_on'] = 'active';
+			devinfo['pl_off'] = 'inactive';
+			devinfo['dev_cla'] = 'motion';
+			delete devs[dev]['motion'];
+			configs[hastr + '/binary_sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+
+			// battery
+			if ( 'battery' in devs[dev] ) {
+				devinfo = JSON.parse(cmndevstr);
+				devinfo['name'] = devname + ' Battery';
+				uniqid = devid + '-battery';
+				devinfo['unique_id'] = uniqid;
+				devinfo['dev_cla'] = 'battery';
+				devinfo['unit_of_meas'] = '%';
+				devinfo['stat_t'] =  devs[dev]['battery']['state'];
+				delete devs[dev]['battery'];
+				configs[hastr + '/sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+			}
+
+			// tamper
+			if ( 'tamper' in devs[dev] ) {
+				devinfo = JSON.parse(cmndevstr);
+				devinfo['name'] = devname + ' Tamper';
+				uniqid = devid + '-tamper';
+				devinfo['unique_id'] = uniqid;
+				devinfo['dev_cla'] = 'safety';
+				devinfo['stat_t'] =  devs[dev]['tamper']['state'];
+				delete devs[dev]['tamper'];
+				configs[hastr + '/binary_sensor/' + devid + '/' + uniqid + '/config'] = JSON.stringify(devinfo);
+			}
 		}else {
 			winston.info('Device ' + dev + ' has unsupported type ' + devtype + ', skipping');
 			continue;

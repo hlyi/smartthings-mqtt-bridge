@@ -38,13 +38,14 @@
     "js-yaml": "^3.4.3",
     "jsonfile": "^2.2.3",
     "mqtt": "^1.7.0",
-    "request": "^2.65.0",
+    "requestretry": "^6.0.0",
     "semver": "^5.1.0",
     "winston": "^2.0.0"
   },
   "devDependencies": {
     "jenkins-mocha": "^6.0.0",
     "jscs": "^3.0.7",
+    "eslint": "^8.0.0",
     "jshint": "^2.9.1"
   }
 }

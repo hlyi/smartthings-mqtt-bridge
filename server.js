@@ -15,7 +15,7 @@ var	winston = require('winston'),
 	jsonfile = require('jsonfile'),
 	fs = require('fs'),
 	semver = require('semver'),
-	request = require('request');
+	request = require('requestretry');
 
 var	CONFIG_DIR = process.env.CONFIG_DIR || process.cwd(),
 	CONFIG_FILE = path.join(CONFIG_DIR, 'config.yml'),
@@ -165,6 +165,18 @@ function migrateState (version) {
 		config.port = 8080;
 	}
 
+	if (!config.http) {
+		config.http = {};
+	}
+	if (!config.http.timeout ) {
+		config.http.timeout = 3000;
+	}
+	if (!config.http.retry ) {
+		config.http.retry = 4;
+	}
+	if (!config.http.retryDelay ) {
+		config.http.retryDelay = 2000;
+	}
 	// Default protocol
 	if (!url.parse(config.mqtt.host).protocol) {
 		config.mqtt.host = 'mqtt://' + config.mqtt.host;
@@ -543,9 +555,13 @@ function parseMQTTMessage (topic, message) {
 		winston.info('Ignore message due to subscription blackout window: %s/%s = %s', device, property, contents);
 		return;
 	}
-	winston.info('Sending to Smartthings: %s/%s = %s', device, property, contents);
+	winston.info('Sending to Smartthings(%s): %s/%s = %s', callback, device, property, contents);
 	request.post({
 		url: 'http://' + callback,
+		timeout: config.http.timeout,
+		maxAttempts: config.http.retry,
+		retryDelay: config.http.retryDelay,
+		retryStrategy: request.RetryStrategies.ESOCKETTIMEDOUT,
 		json: {
 			name: device,
 			type: property,
